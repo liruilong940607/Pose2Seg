@@ -1,0 +1,10 @@
+*.pyc
+*.so
+*.pkl
+*.json
+
+.ipynb_checkpoints/
+__pycache__
+init
+logs
+snapshot
