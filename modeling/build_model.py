@@ -38,7 +38,7 @@ class Pose2Seg(nn.Module):
         else:
             self.segnet = resnet10units(256)  
         self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', 
-                                     visualize=False, factor = 1.1)
+                                     visualize=False, factor = 1.3)
         
         mean = (0.485, 0.456, 0.406)
         std = (0.229, 0.224, 0.225)
@@ -224,7 +224,7 @@ class Pose2Seg(nn.Module):
             netOutput = netOutput.detach().data.cpu().numpy()
             output = self._getMaskOutput(netOutput)
             
-            if self.visCount < 10:
+            if self.visCount < 0:
                 self._visualizeOutput(netOutput)
                 self.visCount += 1
             

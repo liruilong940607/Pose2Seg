@@ -18,7 +18,14 @@ from lib.torch_utils import adjust_learning_rate
 from modeling.build_model import Pose2Seg
 from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
 
-NAME = 'pose2seg_nocat'
+# #CUDA_VISIBLE_DEVICES=3 python train.py
+# NAME = 'pose2seg_nocat_cuda3_factor1.0'
+# #CUDA_VISIBLE_DEVICES=4 python train.py
+# NAME = 'pose2seg_nocat_cuda4_factor1.1'
+# #CUDA_VISIBLE_DEVICES=5 python train.py
+# NAME = 'pose2seg_nocat_cuda5_factor1.2'
+#CUDA_VISIBLE_DEVICES=6 python train.py
+NAME = 'pose2seg_nocat_cuda6_factor1.3'
 
 # Set `LOG_DIR` and `SNAPSHOT_DIR`
 def setup_logdir():
@@ -53,7 +60,7 @@ def train(model, dataloader, optimizer, epoch, iteration):
         
         lr = adjust_learning_rate(optimizer, iteration, BASE_LR=0.0002,
                          WARM_UP_FACTOR=1.0/3, WARM_UP_ITERS=1000,
-                         STEPS=(0, 408000, 528000), GAMMA=0.1)   
+                         STEPS=(0, 14150*15, 14150*20), GAMMA=0.1)    # 408000, 528000
         
         # forward
         outputs = model(**inputs)
@@ -122,8 +129,8 @@ def test(model, dataset='cocoVal'):
     from tqdm import tqdm
     
     if dataset == 'OCHuman':
-        ImageRoot = '/home/dalong/nas/data/OCHuman/v2/images'
-        AnnoFile = '/home/dalong/nas/data/OCHuman/v2/OCHuman_v2_all_range_0.00_1.00.json'
+        ImageRoot = '/home/dalong/nas/data/OCHuman/v4/images'
+        AnnoFile = '/home/dalong/nas/data/OCHuman/v4/OCHuman_v2_val_range_0.00_1.00.json'
     elif dataset == 'cocoVal':
         ImageRoot = '/home/dalong/nas/data/coco2017/val2017'
         AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
@@ -201,7 +208,7 @@ if __name__=='__main__':
     iteration = 0
     epoch = 0
     try:
-        while iteration < 1400000:
+        while iteration < 14150*25:
             logger.info('===========>   training    <===========')
             iteration = train(model, dataloaderTrain, optimizer, epoch, iteration)
             epoch += 1
