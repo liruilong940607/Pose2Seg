@@ -30,7 +30,7 @@ class Pose2Seg(nn.Module):
         self.size_feat = 128
         self.size_align = 64
         self.size_output = 64
-        self.cat_skeleton = False
+        self.cat_skeleton = True
         
         self.backbone = resnet50FPN(pretrained=True)
         if self.cat_skeleton:
@@ -38,6 +38,15 @@ class Pose2Seg(nn.Module):
         else:
             self.segnet = resnet10units(256)  
         self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', visualize=False)
+        
+        mean = (0.485, 0.456, 0.406)
+        std = (0.229, 0.224, 0.225)
+        self.mean = np.ones((self.size_input, self.size_input, 3)) * mean
+        self.mean = torch.from_numpy(self.mean.transpose(2, 0, 1)).cuda(0).float()
+        
+        self.std = np.ones((self.size_input, self.size_input, 3)) * std
+        self.std = torch.from_numpy(self.std.transpose(2, 0, 1)).cuda(0).float()
+        
         
         pass
     
@@ -50,11 +59,17 @@ class Pose2Seg(nn.Module):
     
     def forward(self, batchimgs, batchkpts, batchmasks=None):
         timers['(cpu+gpu) total'].tic()
-        timers['(cpu)pre-process'].tic()
+        
         self._setInputs(batchimgs, batchkpts, batchmasks)
+        
+        timers['(cpu)pre-process2'].tic()
         self._calcNetInputs()
+        timers['(cpu)pre-process2'].toc()
+        
+        timers['(cpu)pre-process3'].tic()
         self._calcAlignMatrixs()
-        timers['(cpu)pre-process'].toc()
+        timers['(cpu)pre-process3'].toc()
+        
         output = self._forward()
         timers['(cpu+gpu) total'].toc()
         
@@ -97,10 +112,19 @@ class Pose2Seg(nn.Module):
                                                       scale_range=(1., 1.), 
                                                       trans_range=(-0., 0.))[0] \
                              for img in self.batchimgs]
-    
+        
         inputs = [cv2.warpAffine(img, matrix[0:2], (512, 512)) \
                   for img, matrix in zip(self.batchimgs, self.inputMatrixs)]
-        inputs = preprocess(np.array(inputs)).transpose(0, 3, 1, 2).astype('float32')     
+        
+        if len(inputs) == 1:
+            inputs = inputs[0][np.newaxis, ...]
+        else:
+            inputs = np.array(inputs)
+        
+        inputs = inputs[..., ::-1]
+        inputs = inputs.transpose(0, 3, 1, 2)
+        inputs = inputs.astype('float32')     
+        
         self.inputs = inputs
         
             
@@ -116,21 +140,27 @@ class Pose2Seg(nn.Module):
         m2 = translib.stride_matrix(size_feat / size_input)
         m4 = translib.stride_matrix(size_output / size_align)
         
-        
         self.featAlignMatrixs = [[] for _ in range(self.bz)]
         self.maskAlignMatrixs = [[] for _ in range(self.bz)]
         if self.cat_skeleton:
-            self.skeletonFeats = [[] for _ in range(self.bz)]
+            self.skeletonFeats = [[] for _ in range(self.bz)]        
         for i, (matrix, kpts, masks) in enumerate(zip(self.inputMatrixs, self.batchkpts, self.batchmasks)):
             m1 = matrix    
             # transform gt_kpts to feature coordinates.
             kpts = translib.warpAffineKpts(kpts, m2.dot(m1))
             
-            for kpt, mask in zip(kpts, masks):    
+            self.featAlignMatrixs[i] = np.zeros((len(kpts), 3, 3), dtype=np.float32)
+            self.maskAlignMatrixs[i] = np.zeros((len(kpts), 3, 3), dtype=np.float32)
+            if self.cat_skeleton:
+                self.skeletonFeats[i] = np.zeros((len(kpts), 55, size_align, size_align), dtype=np.float32)
+                
+            for j, (kpt, mask) in enumerate(zip(kpts, masks)):    
+                timers['2'].tic()
                 ## best_align: {'category', 'template', 'matrix', 'score', 'history'}
                 best_align = self.poseAlignOp.align(kpt, size_feat, size_feat, 
                                                     size_align, size_align, 
                                                     visualize=False, return_history=False)
+                timers['2'].toc()
                 
                 ## aug
                 if self.training:
@@ -143,33 +173,34 @@ class Pose2Seg(nn.Module):
                 else:
                     m3 = best_align['matrix']
                 
-                self.featAlignMatrixs[i].append(m3)
-                self.maskAlignMatrixs[i].append(m4.dot(m3).dot(m2).dot(m1))
+                self.featAlignMatrixs[i][j] = m3
+                self.maskAlignMatrixs[i][j] = m4.dot(m3).dot(m2).dot(m1)
                 
+                timers['4'].tic()
                 if self.cat_skeleton:
                     # size_align (sigma=3, threshold=1) for size_align=64
-                    self.skeletonFeats[i].append(genSkeletons(translib.warpAffineKpts([kpt], m3), 
+                    self.skeletonFeats[i][j] = genSkeletons(translib.warpAffineKpts([kpt], m3), 
                                                               size_align, size_align, 
                                                               stride=1, sigma=3, threshold=1,
-                                                              visdiff = True).transpose(2, 0, 1))
+                                                              visdiff = True).transpose(2, 0, 1)
+                timers['4'].toc()
                 
                 
-            self.featAlignMatrixs[i] = np.array(self.featAlignMatrixs[i]).reshape(-1, 3, 3)
-            self.maskAlignMatrixs[i] = np.array(self.maskAlignMatrixs[i]).reshape(-1, 3, 3)
-            if self.cat_skeleton:
-                self.skeletonFeats[i] = np.array(self.skeletonFeats[i]).reshape(-1, 55, size_align, size_align)
-            
     def _forward(self):
-        inputs = torch.from_numpy(self.inputs).cuda(0)
-        timers['(gpu)backbone'].tic()
+        timers['(gpu)'].tic()
+        #########################################################################################################
+        ## If we use `pytorch` pretrained model, the input should be RGB, and normalized by the following code:
+        ##      normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+        ##                                       std=[0.229, 0.224, 0.225])
+        ## Note: input[channel] = (input[channel] - mean[channel]) / std[channel], input is (0,1), not (0,255)
+        #########################################################################################################
+        inputs = (torch.from_numpy(self.inputs).cuda(0) / 255.0 - self.mean) / self.std
         [p1, p2, p3, p4] = self.backbone(inputs)
         feature = p1
-        timers['(gpu)backbone'].toc()
         
         alignHs = np.vstack(self.featAlignMatrixs)
         indexs = np.hstack([idx * np.ones(len(m),) for idx, m in enumerate(self.featAlignMatrixs)])
         
-        timers['(gpu)affine_align_gpu'].tic()
         rois = affine_align_gpu(feature, indexs, 
                                  (self.size_align, self.size_align), 
                                  alignHs)
@@ -180,12 +211,15 @@ class Pose2Seg(nn.Module):
             rois = torch.cat((rois, skeletons), 1)
         
         netOutput = self.segnet(rois)
-        timers['(gpu)affine_align_gpu'].toc()
+        
         
         if self.training:
             loss = self._calcLoss(netOutput)
             return loss
         else:
+            netOutput = F.softmax(netOutput, 1)
+            timers['(gpu)'].toc()
+            netOutput = netOutput.detach().data.cpu().numpy()
             output = self._getMaskOutput(netOutput)
             return output 
         
@@ -204,7 +238,8 @@ class Pose2Seg(nn.Module):
         
     def _getMaskOutput(self, netOutput):
         timers['(cpu)_getMaskOutput'].tic()
-        netOutput = netOutput.detach().data.cpu().numpy().transpose(0, 2, 3, 1)
+
+        netOutput = netOutput.transpose(0, 2, 3, 1)        
         MaskOutput = [[] for _ in range(self.bz)]
         
         idx = 0
@@ -217,29 +252,16 @@ class Pose2Seg(nn.Module):
                 pred_e2e = cv2.warpAffine(predmap, H_e2e[0:2], (width, height), 
                                           borderMode=cv2.BORDER_CONSTANT,
                                           flags=cv2.WARP_INVERSE_MAP+cv2.INTER_LINEAR) 
-            
-                pred_e2e = F.softmax(torch.from_numpy(pred_e2e), 2)[:, :, 1] # H, W
-                pred_e2e = pred_e2e.numpy()
-
+                               
+                pred_e2e = pred_e2e[:, :, 1]
                 pred_e2e[pred_e2e>0.5] = 1
                 pred_e2e[pred_e2e<=0.5] = 0
                 mask = pred_e2e.astype(np.uint8) 
-                MaskOutput[i].append(mask)
+                MaskOutput[i].append(mask)                
                 
                 idx += 1
         timers['(cpu)_getMaskOutput'].toc()
         return MaskOutput
-     
-def preprocess(img): 
-    #########################################################################################################
-    ## If we use `pytorch` pretrained model, the input should be RGB, and normalized by the following code:
-    ##      normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-    ##                                       std=[0.229, 0.224, 0.225])
-    ## Note: input[channel] = (input[channel] - mean[channel]) / std[channel], input is (0,1), not (0,255)
-    #########################################################################################################
-    mean = (0.485, 0.456, 0.406)
-    std = (0.229, 0.224, 0.225)
-    return (np.float32(img[..., ::-1]) / 255.0 - mean) / std
 
         
 def do_eval_coco(image_ids, coco, results, flag):
@@ -261,13 +283,17 @@ if __name__ == '__main__':
     from pycocotools import mask as maskUtils
     from tqdm import tqdm
     
-    ImageRoot = '/home/dalong/nas/data/coco2017/val2017'
-    AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
+#     ImageRoot = '/home/dalong/nas/data/coco2017/val2017'
+#     AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
+    ImageRoot = '/home/dalong/nas/data/OCHuman/v2/images'
+    AnnoFile = '/home/dalong/nas/data/OCHuman/v2/OCHuman_v2_all_range_0.00_1.00.json'
     datainfos = CocoDatasetInfo(ImageRoot, AnnoFile, onlyperson=True, loadimg=True)
     
     model = Pose2Seg().cuda(0)
     model.init('../init/coco/best.pkl')
     model.eval()
+    
+    Ntotal = 0
     
     results_segm = []
     imgIds = []
@@ -280,7 +306,7 @@ if __name__ == '__main__':
         gt_kpts = np.float32(rawdata['gt_keypoints']).transpose(0, 2, 1) # (N, 17, 3)
         gt_segms = rawdata['segms']
         gt_masks = np.array([annToMask(segm, height, width) for segm in gt_segms])
-    
+        Ntotal += len(gt_kpts)
         #print (height, width, len(gt_kpts))
         
         output = model([img], [gt_kpts], [gt_masks])
@@ -303,6 +329,6 @@ if __name__ == '__main__':
     for value in cocoEval.stats.tolist():
         _str += '%.3f '%value
     print(_str)
-    
+    print('AvegPerson:', Ntotal/len(imgIds))
     
     

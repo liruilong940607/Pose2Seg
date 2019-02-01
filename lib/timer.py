@@ -24,7 +24,7 @@ class Timer(object):
 
     def toc(self, average=True):
         self.diff = time.time() - self.start_time
-        if self.warm_up < 0: # don't use warm_up
+        if self.warm_up < 10: # don't use warm_up
             self.warm_up += 1
             return self.diff
         else:
