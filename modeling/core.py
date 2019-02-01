@@ -60,7 +60,7 @@ def pose_affinematrix(src_kpt, dst_kpt, dst_area, hard=False):
 
 
 class PoseAlign():    
-    def __init__(self, template_file='templates.json', visualize=True):
+    def __init__(self, template_file='templates.json', visualize=True, factor=1.0):
         data = json.load(open(template_file, 'r'))
         
         self.npart = len(data['names'])
@@ -68,6 +68,8 @@ class PoseAlign():
         self.templates = np.array(data['templates']).reshape(-1, self.npart, 3) # (N, 17, 3)
         inds = np.where(self.templates[:, :, -1] < self.vis_threshold)
         self.templates[inds[0], inds[1], :] = 0
+        
+        self.templates[:, :, 0:2] = ((self.templates[:, :, 0:2] - 0.5) * factor) + 0.5
         
         # expand templates by left-right flip
         self.templates_flipped = self.flip_keypoints(data['names'], data['flip_map'], self.templates)
@@ -131,7 +133,7 @@ class PoseAlign():
             if score > best_dict['score']:
                 best_dict['category'] = category
             
-            if score > best_dict['score'] and scale > basic_scale:
+            if score > best_dict['score']:# and scale > basic_scale:
                 best_dict['template'] = pose
                 best_dict['matrix'] = matrix
                 best_dict['score'] = score

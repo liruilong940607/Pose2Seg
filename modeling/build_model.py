@@ -30,14 +30,15 @@ class Pose2Seg(nn.Module):
         self.size_feat = 128
         self.size_align = 64
         self.size_output = 64
-        self.cat_skeleton = True
+        self.cat_skeleton = False
         
         self.backbone = resnet50FPN(pretrained=True)
         if self.cat_skeleton:
             self.segnet = resnet10units(256 + 55)  
         else:
             self.segnet = resnet10units(256)  
-        self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', visualize=False)
+        self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', 
+                                     visualize=False, factor = 1.1)
         
         mean = (0.485, 0.456, 0.406)
         std = (0.229, 0.224, 0.225)
@@ -46,14 +47,15 @@ class Pose2Seg(nn.Module):
         
         self.std = np.ones((self.size_input, self.size_input, 3)) * std
         self.std = torch.from_numpy(self.std.transpose(2, 0, 1)).cuda(0).float()
-        
+        self.visCount = 0
         
         pass
     
     def init(self, path):
         pretrained_dict = torch.load(path)
         model_dict = self.state_dict()
-        pretrained_dict = {k.replace('pose2seg.seg_branch', 'segnet'): v for k, v in pretrained_dict.items()}
+        pretrained_dict = {k.replace('pose2seg.seg_branch', 'segnet'): v for k, v in pretrained_dict.items() \
+                           if 'num_batches_tracked' not in k}
         model_dict.update(pretrained_dict) 
         self.load_state_dict(model_dict)
     
@@ -221,6 +223,11 @@ class Pose2Seg(nn.Module):
             timers['(gpu)'].toc()
             netOutput = netOutput.detach().data.cpu().numpy()
             output = self._getMaskOutput(netOutput)
+            
+            if self.visCount < 10:
+                self._visualizeOutput(netOutput)
+                self.visCount += 1
+            
             return output 
         
     def _calcLoss(self, netOutput):
@@ -262,7 +269,42 @@ class Pose2Seg(nn.Module):
                 idx += 1
         timers['(cpu)_getMaskOutput'].toc()
         return MaskOutput
-
+    
+    def _visualizeOutput(self, netOutput):
+        outdir = '/home/dalong/nas/CVPR2019/Pose2Seg/vis/'
+        netOutput = netOutput.transpose(0, 2, 3, 1)        
+        MaskOutput = [[] for _ in range(self.bz)]
+        
+        mVis = translib.stride_matrix(4)
+        
+        idx = 0
+        for i, (img, masks) in enumerate(zip(self.batchimgs, self.batchmasks)):
+            height, width = img.shape[0:2]
+            for j in range(len(masks)):
+                predmap = netOutput[idx]
+                
+                predmap = predmap[:, :, 1]
+                predmap[predmap>0.5] = 1
+                predmap[predmap<=0.5] = 0
+                predmap = cv2.cvtColor(predmap, cv2.COLOR_GRAY2BGR)
+                predmap = cv2.warpAffine(predmap, mVis[0:2], (256, 256))
+                
+                matrix = self.maskAlignMatrixs[i][j]
+                matrix = mVis.dot(matrix)
+                
+                imgRoi = cv2.warpAffine(img, matrix[0:2], (256, 256))
+                
+                mask = cv2.warpAffine(masks[j], matrix[0:2], (256, 256))
+                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+                
+                I = np.logical_and(mask, predmap)
+                U = np.logical_or(mask, predmap)
+                iou = I.sum() / U.sum()
+                
+                vis = np.hstack((imgRoi, mask*255, predmap*255))
+                cv2.imwrite(outdir + '%d_%d_%.2f.jpg'%(self.visCount, j, iou), np.uint8(vis))
+                
+                idx += 1
         
 def do_eval_coco(image_ids, coco, results, flag):
     from pycocotools.cocoeval import COCOeval
@@ -275,6 +317,7 @@ def do_eval_coco(image_ids, coco, results, flag):
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize() 
+    # print(cocoEval.ious)
     return cocoEval
 
         
@@ -283,14 +326,15 @@ if __name__ == '__main__':
     from pycocotools import mask as maskUtils
     from tqdm import tqdm
     
-#     ImageRoot = '/home/dalong/nas/data/coco2017/val2017'
+#     ImageRoot = '/home/dalong/nas/data/coco2017/val2017' 
 #     AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
-    ImageRoot = '/home/dalong/nas/data/OCHuman/v2/images'
-    AnnoFile = '/home/dalong/nas/data/OCHuman/v2/OCHuman_v2_all_range_0.00_1.00.json'
+    ImageRoot = '/home/dalong/nas/data/OCHuman/v4/images' # 0.071
+    AnnoFile = '/home/dalong/nas/data/OCHuman/v4/OCHuman_v2_all_range_0.00_1.00.json'
     datainfos = CocoDatasetInfo(ImageRoot, AnnoFile, onlyperson=True, loadimg=True)
     
     model = Pose2Seg().cuda(0)
-    model.init('../init/coco/best.pkl')
+    #model.init('../init/coco/best.pkl')
+    model.init('nocat.pkl')
     model.eval()
     
     Ntotal = 0
@@ -311,7 +355,12 @@ if __name__ == '__main__':
         
         output = model([img], [gt_kpts], [gt_masks])
     
+        
+#         for mask in gt_masks:
+#             cv2.imwrite('/home/dalong/nas/CVPR2019/Pose2Seg/vis/gt.jpg', np.uint8(mask*255))
+    
         for mask in output[0]:
+            #cv2.imwrite('/home/dalong/nas/CVPR2019/Pose2Seg/vis/out.jpg', np.uint8(mask*255))
             maskencode = maskUtils.encode(np.asfortranarray(mask))
             maskencode['counts'] = maskencode['counts'].decode('ascii')
             results_segm.append({
