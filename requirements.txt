@@ -1,0 +1,17 @@
+cycler==0.10.0
+Cython==0.29.6
+kiwisolver==1.0.1
+matplotlib==3.0.3
+numpy==1.16.2
+opencv-python==4.0.0.21
+Pillow==6.0.0
+pkg-resources==0.0.0
+pycocotools==2.0
+pyparsing==2.3.1
+python-dateutil==2.8.0
+PyYAML==5.1
+scipy==1.2.1
+six==1.12.0
+torch-nightly==1.0.0.dev20190330
+torchvision-nightly==0.2.1
+tqdm==4.31.1
