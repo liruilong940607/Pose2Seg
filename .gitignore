@@ -1,7 +1,6 @@
 *.pyc
 *.so
 *.pkl
-*.json
 
 .ipynb_checkpoints/
 __pycache__

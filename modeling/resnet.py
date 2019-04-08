@@ -228,11 +228,10 @@ def convert_official(model, src_url, dst_file):
             key = key.replace('downsample.0', 'conv4')
             key = key.replace('downsample.1', 'bn4')
         if key not in model_dict.keys():
-            print ('add', key, 'to the model_dict.')
+            print ('[imagenet pretrain] add', key, 'to the model_dict.')
         else:
             assert model_dict[key].shape == value.shape, 'shape of [%s] is not match!'%key
         model_dict[key] = value
-    os.makedirs(dst_file)
     torch.save(model_dict, dst_file)
         
 '''
@@ -243,6 +242,7 @@ def resnet50C4(pretrained=False, num_classes=None):
     if pretrained:
         pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
+            os.makedirs("./imagenet_pretrain")
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage)) 
     return model
@@ -251,6 +251,7 @@ def resnet50(pretrained=False, num_classes=None):
     if pretrained:
         pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
+            os.makedirs("./imagenet_pretrain")
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
     return model
@@ -259,6 +260,7 @@ def resnet101(pretrained=False, num_classes=None):
     if pretrained:
         pretrain_file = './imagenet_pretrain/resnet101_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
+            os.makedirs("./imagenet_pretrain")
             convert_official(model, model_urls['resnet101'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
     return model
@@ -270,6 +272,7 @@ def resnet50FPN(pretrained=False):
     if pretrained:
         pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
+            os.makedirs("./imagenet_pretrain")
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
     return model
@@ -278,6 +281,7 @@ def resnet101FPN(pretrained=False):
     if pretrained:
         pretrain_file = './imagenet_pretrain/resnet101_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
+            os.makedirs("./imagenet_pretrain")
             convert_official(model, model_urls['resnet101'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
     return model
