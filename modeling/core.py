@@ -133,7 +133,7 @@ class PoseAlign():
             if score > best_dict['score']:
                 best_dict['category'] = category
             
-            if score > best_dict['score']:# and scale > basic_scale:
+            if score > best_dict['score'] and scale > basic_scale:
                 best_dict['template'] = pose
                 best_dict['matrix'] = matrix
                 best_dict['score'] = score

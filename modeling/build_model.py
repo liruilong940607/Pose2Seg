@@ -30,7 +30,7 @@ class Pose2Seg(nn.Module):
         self.size_feat = 128
         self.size_align = 64
         self.size_output = 64
-        self.cat_skeleton = False
+        self.cat_skeleton = True
         
         self.backbone = resnet50FPN(pretrained=True)
         if self.cat_skeleton:
@@ -38,7 +38,7 @@ class Pose2Seg(nn.Module):
         else:
             self.segnet = resnet10units(256)  
         self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', 
-                                     visualize=False, factor = 1.3)
+                                     visualize=False, factor = 1.0)
         
         mean = (0.485, 0.456, 0.406)
         std = (0.229, 0.224, 0.225)

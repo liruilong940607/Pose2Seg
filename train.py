@@ -24,8 +24,10 @@ from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
 # NAME = 'pose2seg_nocat_cuda4_factor1.1'
 # #CUDA_VISIBLE_DEVICES=5 python train.py
 # NAME = 'pose2seg_nocat_cuda5_factor1.2'
-#CUDA_VISIBLE_DEVICES=6 python train.py
-NAME = 'pose2seg_nocat_cuda6_factor1.3'
+# CUDA_VISIBLE_DEVICES=6 python train.py
+# NAME = 'pose2seg_nocat_cuda6_factor1.3'
+
+NAME = "release_base"
 
 # Set `LOG_DIR` and `SNAPSHOT_DIR`
 def setup_logdir():
