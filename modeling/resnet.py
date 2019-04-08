@@ -232,6 +232,7 @@ def convert_official(model, src_url, dst_file):
         else:
             assert model_dict[key].shape == value.shape, 'shape of [%s] is not match!'%key
         model_dict[key] = value
+    os.makedirs(dst_file)
     torch.save(model_dict, dst_file)
         
 '''
@@ -240,7 +241,7 @@ resnet50(resnetXt50_1x64d), resnet101(resnetXt101_1x64d)
 def resnet50C4(pretrained=False, num_classes=None):
     model = ResnetXtFPN([3, 4, 6], cardinality=1, base_width=64, usefpn=False, num_classes=num_classes)
     if pretrained:
-        pretrain_file = '/home/dalong/nas/data/kaggle/ImageNet/pytorch_imagenet/basemodel/resnet50_from_modelzoo.pth'
+        pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage)) 
@@ -248,7 +249,7 @@ def resnet50C4(pretrained=False, num_classes=None):
 def resnet50(pretrained=False, num_classes=None):
     model = ResnetXtFPN([3, 4, 6, 3], cardinality=1, base_width=64, usefpn=False, num_classes=num_classes)
     if pretrained:
-        pretrain_file = '/home/dalong/nas/data/kaggle/ImageNet/pytorch_imagenet/basemodel/resnet50_from_modelzoo.pth'
+        pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
@@ -256,7 +257,7 @@ def resnet50(pretrained=False, num_classes=None):
 def resnet101(pretrained=False, num_classes=None):
     model = ResnetXtFPN([3, 4, 23, 3], cardinality=1, base_width=64, usefpn=False, num_classes=num_classes)
     if pretrained:
-        pretrain_file = '/home/dalong/nas/data/kaggle/ImageNet/pytorch_imagenet/basemodel/resnet101_from_modelzoo.pth'
+        pretrain_file = './imagenet_pretrain/resnet101_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
             convert_official(model, model_urls['resnet101'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
@@ -267,7 +268,7 @@ resnet50FPN, resnet101FPN
 def resnet50FPN(pretrained=False):
     model = ResnetXtFPN([3, 4, 6, 3], cardinality=1, base_width=64, usefpn=True)
     if pretrained:
-        pretrain_file = '/home/dalong/nas/data/kaggle/ImageNet/pytorch_imagenet/basemodel/resnet50_from_modelzoo.pth'
+        pretrain_file = './imagenet_pretrain/resnet50_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
             convert_official(model, model_urls['resnet50'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))
@@ -275,7 +276,7 @@ def resnet50FPN(pretrained=False):
 def resnet101FPN(pretrained=False):
     model = ResnetXtFPN([3, 4, 23, 3], cardinality=1, base_width=64, usefpn=True)
     if pretrained:
-        pretrain_file = '/home/dalong/nas/data/kaggle/ImageNet/pytorch_imagenet/basemodel/resnet101_from_modelzoo.pth'
+        pretrain_file = './imagenet_pretrain/resnet101_from_modelzoo.pth'
         if not os.path.exists(pretrain_file):
             convert_official(model, model_urls['resnet101'], pretrain_file)
         init_with_pretrain(model, torch.load(pretrain_file, map_location=lambda storage, loc: storage))

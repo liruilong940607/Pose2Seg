@@ -4,6 +4,7 @@ sys.path.insert(0, '../')
 import numpy as np
 import random
 import cv2
+import os.path as osp
 
 import torch
 import torch.nn as nn
@@ -37,7 +38,7 @@ class Pose2Seg(nn.Module):
             self.segnet = resnet10units(256 + 55)  
         else:
             self.segnet = resnet10units(256)  
-        self.poseAlignOp = PoseAlign(template_file='/home/dalong/nas/CVPR2019/Pose2Seg/modeling/templates.json', 
+        self.poseAlignOp = PoseAlign(template_file=osp.dirname(osp.abspath(__file__))+'/templates.json', 
                                      visualize=False, factor = 1.0)
         
         mean = (0.485, 0.456, 0.406)
@@ -60,31 +61,13 @@ class Pose2Seg(nn.Module):
         self.load_state_dict(model_dict)
     
     def forward(self, batchimgs, batchkpts, batchmasks=None):
-        timers['(cpu+gpu) total'].tic()
-        
         self._setInputs(batchimgs, batchkpts, batchmasks)
-        
-        timers['(cpu)pre-process2'].tic()
         self._calcNetInputs()
-        timers['(cpu)pre-process2'].toc()
-        
-        timers['(cpu)pre-process3'].tic()
-        self._calcAlignMatrixs()
-        timers['(cpu)pre-process3'].toc()
-        
-        output = self._forward()
-        timers['(cpu+gpu) total'].toc()
-        
+        self._calcAlignMatrixs()        
+        output = self._forward()        
         # self.visualize(output)
-        
         return output
     
-    def visualize(self, output):
-        for i, (img, outs) in enumerate(zip(self.batchimgs, output)):
-            for j, out in enumerate(outs):
-                cv2.imwrite('%d.jpg'%i, img)
-                cv2.imwrite('%d_res%d.jpg'%(i, j), out*255)
-        
     def _setInputs(self, batchimgs, batchkpts, batchmasks=None):
         ## batchimgs: a list of array (H, W, 3)
         ## batchkpts: a list of array (m, 17, 3)
@@ -162,7 +145,6 @@ class Pose2Seg(nn.Module):
                 best_align = self.poseAlignOp.align(kpt, size_feat, size_feat, 
                                                     size_align, size_align, 
                                                     visualize=False, return_history=False)
-                timers['2'].toc()
                 
                 ## aug
                 if self.training:
@@ -178,18 +160,15 @@ class Pose2Seg(nn.Module):
                 self.featAlignMatrixs[i][j] = m3
                 self.maskAlignMatrixs[i][j] = m4.dot(m3).dot(m2).dot(m1)
                 
-                timers['4'].tic()
                 if self.cat_skeleton:
                     # size_align (sigma=3, threshold=1) for size_align=64
                     self.skeletonFeats[i][j] = genSkeletons(translib.warpAffineKpts([kpt], m3), 
                                                               size_align, size_align, 
                                                               stride=1, sigma=3, threshold=1,
                                                               visdiff = True).transpose(2, 0, 1)
-                timers['4'].toc()
                 
                 
     def _forward(self):
-        timers['(gpu)'].tic()
         #########################################################################################################
         ## If we use `pytorch` pretrained model, the input should be RGB, and normalized by the following code:
         ##      normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
@@ -220,7 +199,6 @@ class Pose2Seg(nn.Module):
             return loss
         else:
             netOutput = F.softmax(netOutput, 1)
-            timers['(gpu)'].toc()
             netOutput = netOutput.detach().data.cpu().numpy()
             output = self._getMaskOutput(netOutput)
             
@@ -244,8 +222,6 @@ class Pose2Seg(nn.Module):
         
         
     def _getMaskOutput(self, netOutput):
-        timers['(cpu)_getMaskOutput'].tic()
-
         netOutput = netOutput.transpose(0, 2, 3, 1)        
         MaskOutput = [[] for _ in range(self.bz)]
         
@@ -267,11 +243,10 @@ class Pose2Seg(nn.Module):
                 MaskOutput[i].append(mask)                
                 
                 idx += 1
-        timers['(cpu)_getMaskOutput'].toc()
         return MaskOutput
     
     def _visualizeOutput(self, netOutput):
-        outdir = '/home/dalong/nas/CVPR2019/Pose2Seg/vis/'
+        outdir = './vis/'
         netOutput = netOutput.transpose(0, 2, 3, 1)        
         MaskOutput = [[] for _ in range(self.bz)]
         
@@ -306,78 +281,3 @@ class Pose2Seg(nn.Module):
                 
                 idx += 1
         
-def do_eval_coco(image_ids, coco, results, flag):
-    from pycocotools.cocoeval import COCOeval
-    assert flag in ['bbox', 'segm', 'keypoints']
-    # Evaluate
-    coco_results = coco.loadRes(results)
-    cocoEval = COCOeval(coco, coco_results, flag)
-    cocoEval.params.imgIds = image_ids
-    cocoEval.params.catIds = [1]
-    cocoEval.evaluate()
-    cocoEval.accumulate()
-    cocoEval.summarize() 
-    # print(cocoEval.ious)
-    return cocoEval
-
-        
-if __name__ == '__main__':
-    from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
-    from pycocotools import mask as maskUtils
-    from tqdm import tqdm
-    
-#     ImageRoot = '/home/dalong/nas/data/coco2017/val2017' 
-#     AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
-    ImageRoot = '/home/dalong/nas/data/OCHuman/v4/images' # 0.071
-    AnnoFile = '/home/dalong/nas/data/OCHuman/v4/OCHuman_v2_all_range_0.00_1.00.json'
-    datainfos = CocoDatasetInfo(ImageRoot, AnnoFile, onlyperson=True, loadimg=True)
-    
-    model = Pose2Seg().cuda(0)
-    #model.init('../init/coco/best.pkl')
-    model.init('nocat.pkl')
-    model.eval()
-    
-    Ntotal = 0
-    
-    results_segm = []
-    imgIds = []
-    for i in tqdm(range(len(datainfos))):
-        rawdata = datainfos[i]
-        img = rawdata['data']
-        image_id = rawdata['id']
-        
-        height, width = img.shape[0:2]
-        gt_kpts = np.float32(rawdata['gt_keypoints']).transpose(0, 2, 1) # (N, 17, 3)
-        gt_segms = rawdata['segms']
-        gt_masks = np.array([annToMask(segm, height, width) for segm in gt_segms])
-        Ntotal += len(gt_kpts)
-        #print (height, width, len(gt_kpts))
-        
-        output = model([img], [gt_kpts], [gt_masks])
-    
-        
-#         for mask in gt_masks:
-#             cv2.imwrite('/home/dalong/nas/CVPR2019/Pose2Seg/vis/gt.jpg', np.uint8(mask*255))
-    
-        for mask in output[0]:
-            #cv2.imwrite('/home/dalong/nas/CVPR2019/Pose2Seg/vis/out.jpg', np.uint8(mask*255))
-            maskencode = maskUtils.encode(np.asfortranarray(mask))
-            maskencode['counts'] = maskencode['counts'].decode('ascii')
-            results_segm.append({
-                    "image_id": image_id,
-                    "category_id": 1,
-                    "score": 1.0,
-                    "segmentation": maskencode
-                })
-        imgIds.append(image_id)
-    
-    timers.print()
-    cocoEval = do_eval_coco(imgIds, datainfos.COCO, results_segm, 'segm')
-    print('[POSE2SEG] AP|.5|.75| S| M| L|    AR|.5|.75| S| M| L|')
-    _str = '[segm_score] '
-    for value in cocoEval.stats.tolist():
-        _str += '%.3f '%value
-    print(_str)
-    print('AvegPerson:', Ntotal/len(imgIds))
-    
-    

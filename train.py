@@ -17,15 +17,7 @@ from lib.torch_utils import adjust_learning_rate
 
 from modeling.build_model import Pose2Seg
 from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
-
-# #CUDA_VISIBLE_DEVICES=3 python train.py
-# NAME = 'pose2seg_nocat_cuda3_factor1.0'
-# #CUDA_VISIBLE_DEVICES=4 python train.py
-# NAME = 'pose2seg_nocat_cuda4_factor1.1'
-# #CUDA_VISIBLE_DEVICES=5 python train.py
-# NAME = 'pose2seg_nocat_cuda5_factor1.2'
-# CUDA_VISIBLE_DEVICES=6 python train.py
-# NAME = 'pose2seg_nocat_cuda6_factor1.3'
+from test import test
 
 NAME = "release_base"
 
@@ -62,7 +54,7 @@ def train(model, dataloader, optimizer, epoch, iteration):
         
         lr = adjust_learning_rate(optimizer, iteration, BASE_LR=0.0002,
                          WARM_UP_FACTOR=1.0/3, WARM_UP_ITERS=1000,
-                         STEPS=(0, 14150*15, 14150*20), GAMMA=0.1)    # 408000, 528000
+                         STEPS=(0, 14150*15, 14150*20), GAMMA=0.1)  
         
         # forward
         outputs = model(**inputs)
@@ -100,8 +92,8 @@ def train(model, dataloader, optimizer, epoch, iteration):
 
 class Dataset():
     def __init__(self):
-        ImageRoot = '/home/dalong/nas/data/coco2017/train2017'
-        AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_train2017_pose2seg.json'
+        ImageRoot = './data/coco2017/train2017'
+        AnnoFile = './data/coco2017/annotations/person_keypoints_train2017_pose2seg.json'
         self.datainfos = CocoDatasetInfo(ImageRoot, AnnoFile, onlyperson=True, loadimg=True)
     
     def __len__(self):
@@ -125,74 +117,10 @@ class Dataset():
         batchmasks = [data['masks'] for data in batch]
         return {'batchimgs': batchimgs, 'batchkpts': batchkpts, 'batchmasks':batchmasks}
         
-def test(model, dataset='cocoVal'):
-    from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
-    from pycocotools import mask as maskUtils
-    from tqdm import tqdm
-    
-    if dataset == 'OCHuman':
-        ImageRoot = '/home/dalong/nas/data/OCHuman/v4/images'
-        AnnoFile = '/home/dalong/nas/data/OCHuman/v4/OCHuman_v2_val_range_0.00_1.00.json'
-    elif dataset == 'cocoVal':
-        ImageRoot = '/home/dalong/nas/data/coco2017/val2017'
-        AnnoFile = '/home/dalong/nas/data/coco2017/annotations/postprocess/person_keypoints_val2017_pose2seg.json'
-    datainfos = CocoDatasetInfo(ImageRoot, AnnoFile, onlyperson=True, loadimg=True)
-    
-    model.eval()
-    
-    results_segm = []
-    imgIds = []
-    for i in tqdm(range(len(datainfos))):
-        rawdata = datainfos[i]
-        img = rawdata['data']
-        image_id = rawdata['id']
-        
-        height, width = img.shape[0:2]
-        gt_kpts = np.float32(rawdata['gt_keypoints']).transpose(0, 2, 1) # (N, 17, 3)
-        gt_segms = rawdata['segms']
-        gt_masks = np.array([annToMask(segm, height, width) for segm in gt_segms])
-    
-        #print (height, width, len(gt_kpts))
-        
-        output = model([img], [gt_kpts], [gt_masks])
-    
-        for mask in output[0]:
-            maskencode = maskUtils.encode(np.asfortranarray(mask))
-            maskencode['counts'] = maskencode['counts'].decode('ascii')
-            results_segm.append({
-                    "image_id": image_id,
-                    "category_id": 1,
-                    "score": 1.0,
-                    "segmentation": maskencode
-                })
-        imgIds.append(image_id)
-    
-    
-    def do_eval_coco(image_ids, coco, results, flag):
-        from pycocotools.cocoeval import COCOeval
-        assert flag in ['bbox', 'segm', 'keypoints']
-        # Evaluate
-        coco_results = coco.loadRes(results)
-        cocoEval = COCOeval(coco, coco_results, flag)
-        cocoEval.params.imgIds = image_ids
-        cocoEval.params.catIds = [1]
-        cocoEval.evaluate()
-        cocoEval.accumulate()
-        cocoEval.summarize() 
-        return cocoEval
-    
-    timers.print()
-    cocoEval = do_eval_coco(imgIds, datainfos.COCO, results_segm, 'segm')
-    logger.info('[POSE2SEG]          AP|.5|.75| S| M| L|    AR|.5|.75| S| M| L|')
-    _str = '[segm_score] %s '%dataset
-    for value in cocoEval.stats.tolist():
-        _str += '%.3f '%value
-    logger.info(_str)
-    
 if __name__=='__main__':
     logger.info('===========> loading model <===========')
     model = Pose2Seg().cuda()
-    #model.init('./init/coco/best.pkl')
+    #model.init("")
     model.train()
     
     logger.info('===========> loading data <===========')
@@ -216,8 +144,8 @@ if __name__=='__main__':
             epoch += 1
             
             logger.info('===========>   testing    <===========')
-            test(model, dataset='cocoVal')
-            test(model, dataset='OCHuman')
+            test(model, dataset='cocoVal', logger=logger.info)
+            test(model, dataset='OCHumanVal', logger=logger.info)
 
 
     except (KeyboardInterrupt):
