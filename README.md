@@ -59,7 +59,7 @@ This allows you to test the model on (1) COCOPersons val set and (2) OCHuman val
 python test.py --weights last.pkl --coco --OCHuman
 ```
 
-## About Pose-templates
+## About Human Pose Templates in COCO
 
 <div align="center">
 <img src="figures/pose_templates.png" width="500px"/>
