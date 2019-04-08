@@ -1,6 +1,6 @@
 # Pose2Seg
 
-*Official* code for the paper "Pose2Seg: Detection Free Human Instance Segmentation"[ProjectPage](http://www.liruilong.cn/Pose2Seg/index.html)[arXiv](https://arxiv.org/abs/1803.10683) @ CVPR2019.
+*Official* code for the paper "Pose2Seg: Detection Free Human Instance Segmentation"[[ProjectPage]](http://www.liruilong.cn/Pose2Seg/index.html)[[arXiv]](https://arxiv.org/abs/1803.10683) @ CVPR2019.
 
 The *OCHuman dataset* proposed in our paper is released [here](https://github.com/liruilong940607/OCHumanApi)
 
