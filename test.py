@@ -66,7 +66,6 @@ def test(model, dataset='cocoVal', logger=print):
         _str += '%.3f '%value
     logger(_str)
     
-# python test.py --weights last.pkl --coco --OCHuman
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="Pose2Seg Testing")
     parser.add_argument(
@@ -93,7 +92,7 @@ if __name__=='__main__':
             
     print('===========>   testing    <===========')
     if args.coco:
-        test(model, dataset='cocoVal') # 579
+        test(model, dataset='cocoVal') 
     if args.OCHuman:
-#         test(model, dataset='OCHumanVal') # 573
-        test(model, dataset='OCHumanTest') # 547
+        test(model, dataset='OCHumanVal')
+        test(model, dataset='OCHumanTest') 
