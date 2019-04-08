@@ -40,7 +40,7 @@ cd -
 The `data` folder should be like this:
 
     data  
-    ├── coco2017 ([link](http://cocodataset.org/))  
+    ├── coco2017
     │   ├── annotations  
     │   │   ├── person_keypoints_train2017_pose2seg.json 
     │   │   ├── person_keypoints_val2017_pose2seg.json 
