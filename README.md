@@ -26,20 +26,20 @@ cd -
 The `data` folder should be like this:
 
 data
- +-- coco2017 ([link](http://cocodataset.org/))  
-         +-- annotations  
-                 +-- person_keypoints_train2017_pose2seg.json ([download](https://github.com/liruilong940607/Pose2Seg/releases/download/data/person_keypoints_train2017_pose2seg.json))  
-                 +-- person_keypoints_val2017_pose2seg.json ([download](https://github.com/liruilong940607/Pose2Seg/releases/download/data/person_keypoints_val2017_pose2seg.json))  
-         +-- train2017  
-                 +-- ####.jpg  
-         +-- val2017  
-                 +-- ####.jpg  
- +-- OCHuman ([link](https://github.com/liruilong940607/OCHumanApi)) [(download)](([download](https://cg.cs.tsinghua.edu.cn/dataset/form.html?dataset=ochuman)))  
-         +-- annotations  
-                 +-- ochuman_coco_format_test_range_0.00_1.00.json   
-                 +-- ochuman_coco_format_val_range_0.00_1.00.json   
-         +-- images  
-                 +-- ####.jpg  
+ |-- coco2017 ([link](http://cocodataset.org/))  
+         |-- annotations  
+                 |-- person_keypoints_train2017_pose2seg.json ([download](https://github.com/liruilong940607/Pose2Seg/releases/download/data/person_keypoints_train2017_pose2seg.json))  
+                 |-- person_keypoints_val2017_pose2seg.json ([download](https://github.com/liruilong940607/Pose2Seg/releases/download/data/person_keypoints_val2017_pose2seg.json))  
+         |-- train2017  
+                 |-- ####.jpg  
+         |-- val2017  
+                 |-- ####.jpg  
+ |-- OCHuman ([link](https://github.com/liruilong940607/OCHumanApi)) [(download)](([download](https://cg.cs.tsinghua.edu.cn/dataset/form.html?dataset=ochuman)))  
+         |-- annotations  
+                 |-- ochuman_coco_format_test_range_0.00_1.00.json   
+                 |-- ochuman_coco_format_val_range_0.00_1.00.json   
+         |-- images  
+                 |-- ####.jpg  
                  
 **Note**: 
 `person_keypoints_(train/val)2017_pose2seg.json` is a subset of `person_keypoints_(train/val)2017.json` (in [COCO2017 Train/Val annotations](http://images.cocodataset.org/annotations/annotations_trainval2017.zip)). We choose those instances with both keypoint and segmentation annotations for our experiments.
