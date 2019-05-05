@@ -70,6 +70,8 @@ This allows you to test the model on (1) COCOPersons val set and (2) OCHuman val
 python test.py --weights last.pkl --coco --OCHuman
 ```
 
+We retrained our model using this repo, and got similar results with our paper. The final weights can be download [here](https://drive.google.com/file/d/193i8b40MJFxawcJoNLq1sG0vhAeLoVJG/view?usp=sharing).
+
 ## About Human Pose Templates in COCO
 
 <div align="center">
