@@ -129,7 +129,7 @@ class Pose2Seg(nn.Module):
         self.maskAlignMatrixs = [[] for _ in range(self.bz)]
         if self.cat_skeleton:
             self.skeletonFeats = [[] for _ in range(self.bz)]        
-        for i, (matrix, kpts, masks) in enumerate(zip(self.inputMatrixs, self.batchkpts, self.batchmasks)):
+        for i, (matrix, kpts) in enumerate(zip(self.inputMatrixs, self.batchkpts)):
             m1 = matrix    
             # transform gt_kpts to feature coordinates.
             kpts = translib.warpAffineKpts(kpts, m2.dot(m1))
@@ -139,7 +139,7 @@ class Pose2Seg(nn.Module):
             if self.cat_skeleton:
                 self.skeletonFeats[i] = np.zeros((len(kpts), 55, size_align, size_align), dtype=np.float32)
                 
-            for j, (kpt, mask) in enumerate(zip(kpts, masks)):    
+            for j, kpt in enumerate(kpts):    
                 timers['2'].tic()
                 ## best_align: {'category', 'template', 'matrix', 'score', 'history'}
                 best_align = self.poseAlignOp.align(kpt, size_feat, size_feat, 
