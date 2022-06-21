@@ -2,7 +2,7 @@ cycler==0.10.0
 Cython==0.29.6
 kiwisolver==1.0.1
 matplotlib==3.0.3
-numpy==1.16.2
+numpy==1.22.0
 opencv-python==4.0.0.21
 Pillow==6.0.0
 pkg-resources==0.0.0
