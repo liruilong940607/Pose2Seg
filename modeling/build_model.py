@@ -44,10 +44,12 @@ class Pose2Seg(nn.Module):
         mean = (0.485, 0.456, 0.406)
         std = (0.229, 0.224, 0.225)
         self.mean = np.ones((self.size_input, self.size_input, 3)) * mean
-        self.mean = torch.from_numpy(self.mean.transpose(2, 0, 1)).cuda(0).float()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.mean = torch.from_numpy(self.mean.transpose(2, 0, 1)).to(device).float()
+
         
         self.std = np.ones((self.size_input, self.size_input, 3)) * std
-        self.std = torch.from_numpy(self.std.transpose(2, 0, 1)).cuda(0).float()
+        self.std = torch.from_numpy(self.std.transpose(2, 0, 1)).cuda(device).float()
         self.visCount = 0
         
         pass
